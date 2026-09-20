@@ -63,7 +63,13 @@ class _OnnxEmbedder:
     def __init__(self):
         from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2
 
-        self._ef = ONNXMiniLM_L6_V2()
+        # Force CPU. Left to auto-detect, onnxruntime prefers
+        # CoreMLExecutionProvider on macOS, and a known onnxruntime/CoreML bug
+        # makes this exact quantized model fail inference on some macOS
+        # versions with "Error executing model: Unable to compute the
+        # prediction ... (error code: -1)". CPU has no such bug and is plenty
+        # fast for a model this size.
+        self._ef = ONNXMiniLM_L6_V2(preferred_providers=["CPUExecutionProvider"])
 
     def encode(self, texts, show_progress_bar: bool = False):
         return [vector.tolist() for vector in self._ef(list(texts))]
