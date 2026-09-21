@@ -276,10 +276,13 @@ def generate(prompt: str, system: str | None = None, cache: bool = True) -> str:
 GROUNDING_INSTRUCTION = """You answer questions using only the documents provided to you.
 
 Rules:
-- Use only the information in the documents below. Do not use anything you know from elsewhere.
-- If the documents don't cover the question, say you don't have enough information. Do not guess.
-- Name the document your answer came from, using the filename given in each excerpt.
-- Be brief. Two or three sentences is usually enough."""
+1. Use only the information in the documents below. Do not use anything you know from elsewhere.
+2. If the documents don't cover the question, say you don't have enough information. Do not guess.
+3. Name the document your answer came from, using the filename given in each excerpt.
+4. Be brief. Two or three sentences is usually enough.
+5. If a document mentions more than one relevant detail (for example, two
+   different date ranges or options), only report the one that actually
+   answers the question asked, not all of them."""
 
 
 def build_prompt(question: str, results) -> str:
