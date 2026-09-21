@@ -22,6 +22,7 @@ to it, write down what you saw, and move on. That's a real observation about
 your pipeline, not giving up.
 """
 
+import re
 from dataclasses import dataclass
 
 import config
@@ -96,8 +97,77 @@ def split_documents(documents: list[Document]) -> list[Chunk]:
       - Is the useful information in one sentence, or spread over a paragraph?
       - Would splitting on paragraph breaks keep more thoughts intact than
         splitting on a character count?
+
+    ── MILESTONE 3: what this now does, in plain English ─────────────────────
+
+    THE IDEA
+    Every guide in this corpus is already written as labelled sections —
+    "## Getting there", "## Eat and drink", "## When to go" — and each one is
+    a self-contained topic. So instead of counting to 800 characters and
+    cutting wherever we land, we cut at the labels.
+
+    THE CATCH
+    All nine town guides use the SAME labels. A chunk reading "## Eat and
+    drink / Four pubs, two cafes..." never says WHICH town it came from, and
+    the search only ever reads the chunk's own text — the filename is stored
+    separately and is not searched.
+
+    THE FIX
+    Paste the document's title ("# Kestrelford") on top of every chunk, so
+    each one names both the place and the topic and stands on its own.
     """
-    return fallback_split(documents)
+    chunks: list[Chunk] = []
+
+    for doc in documents:
+
+        # STEP 1 — Cut the document into blocks, one per "## " heading.
+        #
+        # "\n(?=## )" means: cut at a line break that is FOLLOWED BY "## ".
+        # The "(?=...)" is a look-ahead: it checks the heading is there but
+        # does not eat it. So each block keeps its own heading on top,
+        # instead of the heading being swallowed by the cut.
+        blocks = re.split(r"\n(?=## )", doc.text)
+
+        # STEP 2 — Find the document's title, e.g. "# Kestrelford".
+        #
+        # We only treat the first line as a title if it really starts with
+        # "# ". Without this check, a document that has no title at all
+        # would have its first sentence mistaken for one.
+        first_line = blocks[0].strip().split("\n")[0]
+        title = first_line if first_line.startswith("# ") else ""
+
+        index = 0
+
+        # STEP 3 — Turn each block into a chunk.
+        for position, block in enumerate(blocks):
+            block = block.strip()
+
+            if position == 0:
+                # The opening block. If it is nothing but the title, there
+                # is no information in it, so we skip it. Otherwise it is
+                # an introduction paragraph and we keep it as it is — it
+                # already has the title on top.
+                if block == title:
+                    continue
+                text = block
+            else:
+                # A normal "## " section. Paste the title above it so the
+                # chunk says which town it is about. (If the document had
+                # no title, leave the section as it is.)
+                text = f"{title}\n\n{block}" if title else block
+
+            # STEP 4 — Store the finished chunk.
+            chunks.append(
+                Chunk(
+                    text=text,
+                    source=doc.source,
+                    index=index,
+                    produced_by="chunker.py::split_documents",
+                )
+            )
+            index += 1
+
+    return chunks
 
 
 def describe(chunks: list[Chunk]) -> str:
