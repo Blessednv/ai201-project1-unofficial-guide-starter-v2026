@@ -53,7 +53,7 @@ in at least 5 of 5 tries.
 <!-- The five questions are the ones in `OUT_OF_SCOPE` at the bottom of
      `questions.py`, and `run_eval.py` puts them through the gate and writes
      what happened into your run log. Swap them for your own if you'd rather —
-     just keep five of them, or the "4 of 5" above has nothing to be 4 of. -->
+     just keep five of them, or the "5 of 5" above has nothing to be 5 of. -->
 
 **Why this target:**
 I picked 5 of 5 because my five out-of-scope questions (capital of Mongolia,
@@ -65,7 +65,7 @@ rather than a hedge.
 
 ---
 
-## 4. Something about your chunks
+## 4. Something about your chunks — Chunks don't cut off mid-word or mid-sentence
 
 <!-- YOU WRITE THIS ONE.
 
@@ -91,7 +91,7 @@ instead of blindly slicing text exactly at an arbitrary character limit.
 
 ---
 
-## 5. Your choice
+## 5. Your choice — Answers don't invent facts beyond the sources
 
 <!-- YOU WRITE THIS ONE TOO.
 
