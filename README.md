@@ -153,11 +153,93 @@ June and September for the beach without the crowds. July and August are busy an
 <!-- One complete question and answer, pasted as text, with the source line
      visible. Milestone 4. -->
 
-**Question:**
+**Question:** How long does it take to drive the coast road to Halden Bay?
 
 **Answer:**
 
 ```
+(best distance 0.198, cutoff 0.6)
+
+======================================================================
+System instruction sent with the prompt
+======================================================================
+You answer questions using only the documents provided to you.
+
+Rules:
+1. Use only the information in the documents below. Do not use anything you know from elsewhere.
+2. If the documents don't cover the question, say you don't have enough information. Do not guess.
+3. Name the document your answer came from, using the filename given in each excerpt.
+4. Be brief. Two or three sentences is usually enough.
+5. If a document mentions more than one relevant detail (for example, two
+   different date ranges or options), only report the one that actually
+   answers the question asked, not all of them.
+
+======================================================================
+The assembled prompt, exactly as sent
+======================================================================
+Documents:
+
+[from guide_halden_bay.md]
+# Halden Bay
+
+## Getting there
+
+The coast road is the only approach and it is slow — 40 minutes for 22 miles, with the last stretch cut into the cliff. Buses run four times a day. Parking in the town itself is limited to two small lots that fill by 10am on summer weekends; the overflow lot is a 12-minute walk up a hill.
+
+[from guide_regional_transport.md]
+# Getting around the region
+
+## Driving
+
+Roads are good between the towns and poor on the approaches to both Kestrelford
+and Halden Bay. The Kestrelford approach is single-track with passing places
+for the final eight minutes. The Halden Bay coast road is cut into the cliff
+and is slow rather than difficult.
+
+Parking is the constraint rather than driving. Both Halden Bay lots fill by
+10am on summer weekends. Kestrelford's lower car park is free and involves a
+steep walk up.
+
+[from guide_halden_bay.md]
+# Halden Bay
+
+## What to see
+
+The harbour at 6am when the boats come in is the thing worth setting an alarm for. The coastal path runs in both directions, north to a lighthouse in about two hours and south along the cliffs for as far as you want. The small museum on Fell Street covers the fishing industry and takes 40 minutes.
+
+[from guide_halden_bay.md]
+# Halden Bay
+
+## Getting around
+
+The town is small enough to cross in fifteen minutes but is built on three levels connected by stepped lanes, which makes it hard going with luggage or a pushchair. The harbour front is level; everything above it is not.
+
+[from guide_walking.md]
+# Walking in the region
+
+## Serious, and weather-dependent
+
+The **Halden Bay coastal path** runs north to a lighthouse in about two hours
+and south along the cliffs indefinitely. It is exposed, and it is closed in high
+wind — this is enforced and the closures are not advisory.
+
+The **Elder Ness shingle** walk to the lighthouse is only 25 minutes but shingle
+is much harder going than the distance suggests. The single access road to the
+headland floods at the highest spring tides, about six times a year, for roughly
+two hours either side of high water.
+
+---
+
+Question: How long does it take to drive the coast road to Halden Bay?
+
+Answer using only the documents above, and name the file you used.
+======================================================================
+
+It takes 40 minutes to drive the coast road to Halden Bay (from `guide_halden_bay.md`).
+
+Sources retrieved: guide_halden_bay.md, guide_regional_transport.md, guide_walking.md
+
+1 model calls this session, 716 tokens (689 in, 27 out)
 ```
 
 **My relevance cutoff:**
@@ -171,9 +253,25 @@ June and September for the beach without the crowds. July and August are busy an
 
      Milestone 4. -->
 
+I kept the starter's default of **0.6**. I ran my five test questions and the
+five `OUT_OF_SCOPE` questions and measured the best distance for each. My
+worst in-corpus question scored 0.295 and my closest out-of-scope question
+scored 0.803 — a gap of about 0.5 with nothing in it. 0.6 sits roughly in the
+middle of that gap, giving about 0.3 of slack on either side, so I saw no
+reason to move it away from the default.
+
 | Question | In corpus? | Best distance |
 |---|---|---|
-|  |  |  |
+| How long does it take to drive the coast road to Halden Bay? | Yes | 0.198 |
+| How often do the trams run in Marchwood on weekdays? | Yes | 0.236 |
+| What time does the farm shop at the mouth of Corry Vale close? | Yes | 0.285 |
+| What are the best two months to visit Elder Ness if I want to see the spring bird migration? | Yes | 0.288 |
+| Does Kestrelford have good public transportation within the town itself? | Yes | 0.295 |
+| What is the capital of Mongolia? | No | 0.803 |
+| What is the recommended dosage of ibuprofen for a headache? | No | 0.835 |
+| How do I write a for loop in Rust? | No | 0.836 |
+| How do I change the oil in a diesel engine? | No | 0.888 |
+| Who won the 1994 World Cup? | No | 0.975 |
 
 ## How I Used AI
 
