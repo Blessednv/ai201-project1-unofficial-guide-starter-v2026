@@ -27,6 +27,46 @@
 
      Milestone 5. -->
 
+This project is a digital travel assistant built for a made-up region with
+nine towns and villages — places like Halden Bay, Kestrelford, and Thornby
+Wells. But unlike a general AI chatbot that will try to answer almost
+anything by pulling from everything it has ever read on the internet — which
+can sound confident while being completely wrong — this one works more like a
+strict librarian who only has one shelf of books to work from. That shelf
+holds fourteen actual travel guide documents describing these towns: how to
+get there, where to eat, when the buses run, and the best time of year to
+visit. (Elsewhere in this project, that shelf of documents is called the
+**corpus** — just a technical name for "the specific collection of documents
+this system is allowed to use.") It will only ever answer using what's
+written in the corpus, nothing else.
+
+You can ask it real, specific questions the way you'd ask a knowledgeable
+local — things like "How long does it take to drive the coast road to Halden
+Bay?" or "What time does the farm shop at the mouth of Corry Vale close?"
+When you ask, it doesn't just start typing an answer right away. It first
+searches through the corpus to find the one specific paragraph that actually
+talks about your question, sets aside everything else that isn't relevant,
+and builds its answer only from that passage.
+
+This is where it earns your trust. Before it even tries to answer, it checks
+how closely your question actually matches anything in the corpus. If you ask
+something completely unrelated — like how to change the oil in a diesel
+engine, or who won the 1994 World Cup — that check comes back with no real
+match, and the system honestly says it doesn't have enough information,
+rather than guessing and inventing a confident-sounding answer anyway. (That
+check is called the **relevance gate** elsewhere in this project — think of
+it as a bouncer standing in front of the assistant, only letting questions
+through if they're actually close enough to what's on the shelf.) And on the
+flip side, when a question does get past that gate and finds a genuinely
+relevant passage, the assistant is required to base its answer strictly on
+that passage's exact wording, and to always say which specific guide file the
+information came from — so you can go check it yourself rather than just
+taking its word for it.
+
+Put simply: this is a system that would rather tell you honestly "I don't
+know" than make something up, and it always shows you exactly where its
+answer came from.
+
 ## Chunking Strategy
 
 **Chunk size:** No fixed size — each chunk is one `##` section of a guide, so
@@ -337,7 +377,7 @@ facts that are in my real questions, and raised criterion 3 from 4 of 5 to
 |---|---|---|---|---|---|
 | 1. Retrieved chunk contains the answer | 4 of 5 |  |  |  |  |
 | 2. Every answer names a source | 5 of 5 |  |  |  |  |
-| 3. Gate stops out-of-corpus questions | 4 of 5 |  |  |  |  |
+| 3. Gate stops out-of-corpus questions | 5 of 5 |  |  |  |  |
 | 4. | | | | | |
 | 5. | | | | | |
 
@@ -402,7 +442,7 @@ facts that are in my real questions, and raised criterion 3 from 4 of 5 to
 |---|---|---|---|---|---|
 | 1. Retrieved chunk contains the answer | 4 of 5 |  |  |  |  |
 | 2. Every answer names a source | 5 of 5 |  |  |  |  |
-| 3. Gate stops out-of-corpus questions | 4 of 5 |  |  |  |  |
+| 3. Gate stops out-of-corpus questions | 5 of 5 |  |  |  |  |
 | 4. | | | | | |
 | 5. | | | | | |
 
