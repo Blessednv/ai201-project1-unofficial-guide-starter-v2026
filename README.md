@@ -375,15 +375,70 @@ facts that are in my real questions, and raised criterion 3 from 4 of 5 to
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1. Retrieved chunk contains the answer | 4 of 5 |  |  |  |  |
-| 2. Every answer names a source | 5 of 5 |  |  |  |  |
-| 3. Gate stops out-of-corpus questions | 5 of 5 |  |  |  |  |
-| 4. | | | | | |
-| 5. | | | | | |
+| 1. Retrieved chunk contains the answer | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 2. Every answer names a source | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 3. Gate stops out-of-corpus questions | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 4. Chunks don't cut off mid-word or mid-sentence | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 5. Answers don't invent facts beyond the sources | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
 
-<!-- Underneath, paste the REAL output for each criterion from one of your
-     runs — the actual text your system produced, not a description of it.
-     Name the file and function that produced it. -->
+**Criterion 1 — Retrieved chunk contains the answer**
+Produced by: `store.py::search` (chunks built by `chunker.py::split_documents`)
+
+Actual top retrieved chunk for "How often do the trams run in Marchwood on weekdays?" (distance 0.236):
+
+```
+[guide_marchwood.md#2]
+# Marchwood
+
+## Getting around
+
+A tram network of four lines, running every 8 minutes on weekdays and every 15 at weekends, until midnight. A day ticket costs less than two single fares and nobody tells you this at the machine. The centre is walkable but the interesting districts are not adjacent to each other.
+```
+
+**Criterion 2 — Every answer names a source**
+Produced by: `generate.py::answer_from_chunks`, from `results/run_2026-09-26_1423_before.md`
+
+```
+The tram network in Marchwood runs every 8 minutes on weekdays (from guide_marchwood.md).
+```
+
+**Criterion 3 — Gate stops out-of-corpus questions**
+Produced by: `run_eval.py::check_out_of_scope`, using `gate.py::check`
+
+```
+refused  (best distance 0.803)  What is the capital of Mongolia?
+refused  (best distance 0.888)  How do I change the oil in a diesel engine?
+refused  (best distance 0.975)  Who won the 1994 World Cup?
+refused  (best distance 0.835)  What is the recommended dosage of ibuprofen for a headache?
+refused  (best distance 0.836)  How do I write a for loop in Rust?
+-> gate refused 5 of 5
+```
+
+**Criterion 4 — Chunks don't cut off mid-word or mid-sentence**
+Produced by: `chunker.py::split_documents`, via `python app.py chunks -n 5`
+
+```
+Chunk 1  |  source: guide_accessibility.md#0  |  produced by: chunker.py::split_documents
+# Getting around the region with limited mobility
+
+An honest assessment rather than a promotional one. Some of these places are
+difficult and it is better to know in advance.
+```
+
+**Criterion 5 — Answers don't invent facts beyond the sources**
+Produced by: `generate.py::answer_from_chunks` (input chunk from `store.py::search`)
+
+Retrieved chunk said:
+```
+...running every 8 minutes on weekdays and every 15 at weekends, until midnight...
+```
+
+Generated answer said, from `results/run_2026-09-26_1423_before.md`:
+```
+The tram network in Marchwood runs every 8 minutes on weekdays (from guide_marchwood.md).
+```
+
+No number, town name, or hour appears in the answer that isn't already in the chunk.
 
 ## Verdicts
 
@@ -398,11 +453,11 @@ facts that are in my real questions, and raised criterion 3 from 4 of 5 to
 
 | # | Criterion | Verdict | How I decided |
 |---|---|---|---|
-| 1 |  |  |  |
-| 2 |  |  |  |
-| 3 |  |  |  |
-| 4 |  |  |  |
-| 5 |  |  |  |
+| 1 | Retrieved chunk contains the answer | MET | I pulled the actual top-retrieved chunk for each of the 5 questions with `store.py::search` and checked it against the fact the question was asking for, rather than just trusting the final answer text. All 5 had it, and in every case as the #1 result. |
+| 2 | Every answer names a source | MET | I read all 15 generated answers (5 questions × 3 runs) and every single one names at least one source filename. No exceptions to check further. |
+| 3 | Gate stops out-of-corpus questions | MET | `run_eval.py::check_out_of_scope` refused all 5 out-of-scope questions, and the closest one (0.803) still sat well above the 0.6 cutoff, so it wasn't a near miss. |
+| 4 | Chunks don't cut off mid-word or mid-sentence | MET | `python app.py chunks -n 5` sampled 5 chunks spread across the index, and all 5 began at a Markdown heading rather than mid-word — consistent with the heading-based chunker built in Unit 1. |
+| 5 | Answers don't invent facts beyond the sources | MET | I compared each of the 15 generated answers against the retrieved chunk text it was built from. No answer introduced a name, price, or hour that wasn't already present in its source chunk. |
 
 ## Diagnoses
 
