@@ -18,8 +18,11 @@ rest of the project if they were wrong:
 """
 
 import os
+import re
 import shutil
 from dataclasses import dataclass
+
+from rank_bm25 import BM25Okapi
 
 # Must be set BEFORE chromadb is imported. Without it, some Chroma versions
 # print "Failed to send telemetry event ..." on every single call — which looks
@@ -49,6 +52,33 @@ _model = None
 # The model Chroma bundles. Anything else in config.EMBEDDING_MODEL means
 # "fetch that one from Hugging Face instead" — see `_embedder`.
 BUNDLED_MODEL = "all-MiniLM-L6-v2"
+
+# Reciprocal Rank Fusion's damping constant. 60 is the value from the paper
+# that introduced RRF, and the usual default.
+RRF_K = 60
+
+_bm25_cache: dict[str, tuple[BM25Okapi, dict[str, int]]] = {}
+
+
+def _tokenize(text: str) -> list[str]:
+    """Words and numbers, lowercased. Keeps '4pm' and '8' as searchable terms."""
+    return re.findall(r"\w+", text.lower())
+
+
+def _bm25_index(name: str, collection):
+    """Build a BM25 index over every chunk in a collection, once per process."""
+    if name in _bm25_cache:
+        return _bm25_cache[name]
+
+    stored = collection.get()
+    positions = {
+        f"{meta.get('source', 'unknown')}#{meta.get('index', 0)}": i
+        for i, meta in enumerate(stored["metadatas"])
+    }
+    index = BM25Okapi([_tokenize(text) for text in stored["documents"]])
+
+    _bm25_cache[name] = (index, positions)
+    return _bm25_cache[name]
 
 
 class _OnnxEmbedder:
@@ -155,6 +185,7 @@ def build_index(
     """
     name = config.collection_name(corpus, variant)
     client = _client()
+    _bm25_cache.pop(name, None)
 
     try:
         client.delete_collection(name)
@@ -191,9 +222,14 @@ def search(
     variant: str = "default",
 ) -> list[Result]:
     """
-    Retrieve the chunks closest in meaning to a question.
+    Retrieve the chunks closest to a question, ranked by meaning AND keywords.
 
-    Returns them nearest-first, each with its distance.
+    Semantic similarity alone can blur two documents that restate the same
+    fact. BM25 pins on exact terms — town names, times, numbers — and
+    Reciprocal Rank Fusion combines the two rankings into one.
+
+    Every Result keeps its true cosine distance, so gate.py's cutoff still
+    means what it meant before this became a hybrid search.
     """
     top_k = top_k or config.TOP_K
     name = config.collection_name(corpus, variant)
@@ -205,25 +241,44 @@ def search(
             f"No index called '{name}'. Run `python app.py index` first."
         ) from exc
 
+    # Score every chunk, not just the nearest few, so a chunk that only BM25
+    # likes still arrives with a real cosine distance for the gate to read.
     raw = collection.query(
         query_embeddings=embed([question]),
-        n_results=min(top_k, collection.count()),
+        n_results=collection.count(),
     )
 
-    results: list[Result] = []
-    for text, meta, distance in zip(
-        raw["documents"][0], raw["metadatas"][0], raw["distances"][0]
-    ):
-        results.append(
-            Result(
-                text=text,
-                source=str(meta.get("source", "unknown")),
-                label=f"{meta.get('source', 'unknown')}#{meta.get('index', 0)}",
-                distance=float(distance),
-                produced_by=str(meta.get("produced_by", "unknown")),
-            )
+    candidates = [
+        Result(
+            text=text,
+            source=str(meta.get("source", "unknown")),
+            label=f"{meta.get('source', 'unknown')}#{meta.get('index', 0)}",
+            distance=float(distance),
+            produced_by=str(meta.get("produced_by", "unknown")),
         )
-    return results
+        for text, meta, distance in zip(
+            raw["documents"][0], raw["metadatas"][0], raw["distances"][0]
+        )
+    ]
+
+    index, positions = _bm25_index(name, collection)
+    keyword_scores = index.get_scores(_tokenize(question))
+    by_keyword = sorted(
+        range(len(candidates)),
+        key=lambda i: keyword_scores[positions[candidates[i].label]],
+        reverse=True,
+    )
+
+    # Chroma already returned these nearest-first, so a candidate's position in
+    # the list IS its semantic rank.
+    fused: dict[int, float] = {}
+    for rank in range(len(candidates)):
+        fused[rank] = 1.0 / (RRF_K + rank)
+    for rank, i in enumerate(by_keyword):
+        fused[i] += 1.0 / (RRF_K + rank)
+
+    best = sorted(fused, key=lambda i: fused[i], reverse=True)[:top_k]
+    return [candidates[i] for i in best]
 
 
 def index_exists(corpus: str | None = None, variant: str = "default") -> bool:
@@ -242,5 +297,6 @@ def index_exists(corpus: str | None = None, variant: str = "default") -> bool:
 
 def reset():
     """Delete every index. Occasionally the fastest way out of a mess."""
+    _bm25_cache.clear()
     if config.CHROMA_DIR.exists():
         shutil.rmtree(config.CHROMA_DIR)
