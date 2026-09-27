@@ -479,6 +479,14 @@ No number, town name, or hour appears in the answer that isn't already in the ch
 
      Milestone 3. -->
 
+I missed nothing at all. Every single target was met with a perfect score across all three runs.
+
+Before accepting that, I stress-tested the closest call — Criterion 1 on the Elder Ness bird-migration question — by arguing the opposite verdict as hard as I could. The retrieved chunk lists two date ranges ("April to May and September to October for birds") without ever labeling either one "spring," so the answer depends on an inference (April-May = spring) that isn't literally stated in the text. The verdict held anyway, because the corpus explicitly establishes itself as UK-style, making that seasonal mapping an ordinary reading rather than an invented fact — but it's a real interpretive gap in what "contains the answer" means, worth flagging honestly rather than pretending the margin was as clean as 5/5 suggests.
+
+Beyond that one nuance, this isn't because the test was too easy, but because I preemptively fixed the biggest points of failure during Unit 1. The starter code's naive 800-character chunker would have caused me to miss Criterion 1 and Criterion 4 by slicing sentences in half and stripping out geographic context. By engineering a custom chunker that splits on `##` headings and prepends the town name to every chunk, the retrieval stage successfully grabbed the complete, correct paragraph every time, which made the generation stage flawless.
+
+Because my system cleared everything so easily, my targets for **Criterion 1** and **Criterion 4** were set too safely. I set them both at `4 of 5` to allow for edge-case errors. Knowing how well the semantic `##` chunker performs, I would tighten both of those targets to a strict `5 of 5`.
+
 ## The Improvement
 
 **What I changed:**
