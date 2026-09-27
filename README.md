@@ -489,34 +489,165 @@ Because my system cleared everything so easily, my targets for **Criterion 1** a
 
 ## The Improvement
 
-**What I changed:**
+**What I changed:** Hybrid search. Retrieval previously matched on meaning
+alone (cosine similarity over embeddings). I added BM25 keyword search
+alongside it in `store.py::search` and combined the two rankings with
+Reciprocal Rank Fusion. Nothing else in the pipeline changed — not the
+chunker, not the prompt, not the threshold, not the questions.
 
-**Why I picked it:**
+One implementation detail mattered more than the rest: `gate.py::check`
+compares a distance against a `0.6` cutoff that is calibrated against cosine
+distance. If I had written the fused score into `Result.distance`, that cutoff
+would have silently started comparing against a number that means something
+entirely different, and out-of-corpus questions could have begun passing the
+gate. So every result keeps its true cosine distance, and the keyword score
+only affects *which* chunks are selected, never the number the gate reads.
 
-<!-- Connect it to a specific diagnosis above in one sentence. If you can't,
-     you picked a fix because it sounded impressive. -->
+**Why I picked it:** My original reasoning for Criterion 1 in `criteria.md` —
+written before I had any results — named one specific risk: that two documents
+restating the same fact (the Marchwood tram frequency, the Kestrelford
+transport fact) might cause retrieval to surface the less-detailed duplicate
+instead of the primary source. BM25 pins on exact terms like "Marchwood" and
+"trams", which is the direct lever on that risk, so this is the one change my
+own stated diagnosis actually pointed at.
 
 ### Run Log — After
 
-<!-- Same format, same five criteria, three runs each.
-     `python run_eval.py --label after` -->
-
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1. Retrieved chunk contains the answer | 4 of 5 |  |  |  |  |
-| 2. Every answer names a source | 5 of 5 |  |  |  |  |
-| 3. Gate stops out-of-corpus questions | 5 of 5 |  |  |  |  |
-| 4. | | | | | |
-| 5. | | | | | |
+| 1. Retrieved chunk contains the answer | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 2. Every answer names a source | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 3. Gate stops out-of-corpus questions | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 4. Chunks don't cut off mid-word or mid-sentence | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 5. Answers don't invent facts beyond the sources | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+
+Evidence: `results/run_2026-09-26_2230_after.md` (before:
+`results/run_2026-09-26_1423_before.md`).
+
+**Criterion 1 — Retrieved chunk contains the answer**
+Produced by: `store.py::search` (now hybrid: cosine + BM25 fused with RRF)
+
+The same Marchwood question as the before-run, showing the full top five in
+rank order. The answer chunk is still retrieved, but it is no longer first:
+
+```
+1.        guide_eating.md#2                dist=0.413
+2. ANSWER guide_marchwood.md#2             dist=0.236
+3.        guide_regional_transport.md#1    dist=0.518
+4.        guide_kestrelford.md#1           dist=0.516
+5.        guide_marchwood.md#1             dist=0.460
+```
+
+The chunk BM25 promoted to first place:
+
+```
+[guide_eating.md#2]
+# Eating across the region
+
+## Markets
+
+Kestrelford's Saturday market has run since the 1400s and is the region's best,
+though much reduced from November to February. Brightwater's Tuesday market
+sets up at 7am in the square and is finished by 1pm. Marchwood's covered market
+has operated since 1863, runs six days a week, and is at its best on a weekday
+morning.
+```
+
+**Criterion 2 — Every answer names a source**
+Produced by: `generate.py::answer_from_chunks`, from `results/run_2026-09-26_2230_after.md`
+
+```
+In Marchwood, the trams run every 8 minutes on weekdays (guide_marchwood.md).
+```
+
+**Criterion 3 — Gate stops out-of-corpus questions**
+Produced by: `run_eval.py::check_out_of_scope`, using `gate.py::check`
+
+```
+refused  (best distance 0.857)  What is the capital of Mongolia?
+refused  (best distance 0.919)  How do I change the oil in a diesel engine?
+refused  (best distance 1.029)  Who won the 1994 World Cup?
+refused  (best distance 0.862)  What is the recommended dosage of ibuprofen for a headache?
+refused  (best distance 0.838)  How do I write a for loop in Rust?
+-> gate refused 5 of 5
+```
+
+**Criterion 4 — Chunks don't cut off mid-word or mid-sentence**
+Produced by: `chunker.py::split_documents`, via `python app.py chunks -n 5`
+
+Identical to the before-run. My one change was to retrieval only, so chunking
+is byte-for-byte the same code producing the same 94 chunks:
+
+```
+Chunk 1  |  source: guide_accessibility.md#0  |  produced by: chunker.py::split_documents
+# Getting around the region with limited mobility
+
+An honest assessment rather than a promotional one. Some of these places are
+difficult and it is better to know in advance.
+```
+
+**Criterion 5 — Answers don't invent facts beyond the sources**
+Produced by: `generate.py::answer_from_chunks` (input chunks from `store.py::search`)
+
+Retrieved chunk said:
+```
+...running every 8 minutes on weekdays and every 15 at weekends, until midnight...
+```
+
+Generated answer said, from `results/run_2026-09-26_2230_after.md`:
+```
+Trams in Marchwood run every 8 minutes on weekdays (guide_marchwood.md).
+```
+
+The model was handed the irrelevant markets chunk first and still took the
+tram frequency from the correct chunk without inventing anything.
 
 **Did it help?**
 
-<!-- Say plainly whether it did, and how you know. If it made things worse,
-     say that — a change that backfired, honestly reported, earns full credit
-     and is more interesting than one that worked. What matters is that you can
-     tell.
+**No.** Every criterion came out exactly where it started — 5/5, MET, all five,
+both times. And on the one measure that could still move, it made things
+*worse*.
 
-     Milestone 4. -->
+The criteria table cannot show this, because it was already at ceiling before I
+changed anything. So I tracked a second number alongside it: the rank of the
+chunk that actually contains the answer.
+
+| Measure | Before | After |
+|---|---|---|
+| All five criteria | 5/5 MET | 5/5 MET — unchanged |
+| Answer chunk ranked #1 | 5 of 5 | **3 of 5** |
+| Out-of-scope gate distances | 0.803–0.975 | 0.838–1.029 |
+
+Two questions lost the top slot. For "How often do the trams run in Marchwood
+on weekdays?", the chunk now ranked **first** is `guide_eating.md#2` — the
+*markets* chunk, which says "Marchwood's covered market ... is at its best on a
+weekday morning". BM25 sees "Marchwood" and "weekday" and scores it highly
+despite it having nothing to do with trams. The tram chunk dropped to rank 2.
+For the Elder Ness question the answer chunk fell from rank 1 to rank 3, and
+`guide_givens_mill.md#6` — a chunk about a completely different town, at
+distance 0.652 — was pulled into the top five as keyword noise.
+
+This is exactly the failure I predicted before building it: duplicates and
+near-matches share literal words too, so keyword matching can pull the wrong
+document in more aggressively than semantic search does.
+
+**Why the criteria didn't register the damage:** generation absorbed it. The
+model receives all five chunks and reads them all, so a junk chunk sitting at
+rank 1 costs it nothing — it still found the tram frequency at rank 2 and cited
+`guide_marchwood.md` correctly in all three runs. The retrieval degradation
+never reached the answer.
+
+**The one accidental gain:** out-of-scope questions now sit *further* from the
+cutoff than before (0.803 → 0.857 for the closest one). Fusion pushes the
+single nearest chunk out of the top five, which raises the minimum distance the
+gate reads, so the gate became slightly more conservative. That is a real
+improvement in safety margin, but it was a side effect rather than the point,
+and it doesn't offset the retrieval ranking getting worse.
+
+**How I know I can tell the difference:** without tracking chunk rank, this
+whole experiment would have read "5/5 before, 5/5 after, no change" and I'd
+have had nothing to report. The criteria I wrote in Unit 1 are not sensitive
+enough to detect a retrieval regression this size.
 
 ## What's Still Broken
 
