@@ -348,6 +348,41 @@ isn't out-of-scope at all. I rewrote criterion 1's reason around duplicated
 facts that are in my real questions, and raised criterion 3 from 4 of 5 to
 5 of 5.
 
+**3.** For Milestone 2, since I was working solo, I asked Claude to argue the
+opposite verdict on my closest call — Criterion 1's Elder Ness question — as
+hard as it could, rather than accepting my own generous first read. It found a
+real gap: the retrieved chunk lists two date ranges ("April to May and
+September to October") without ever labeling either one "spring," so the
+answer depends on an unstated seasonal inference. I checked whether that
+inference was actually risky by rereading my own criteria.md, where I'd
+already established the corpus as UK-style — which settles the hemisphere
+question. I kept the MET verdict, but wrote the interpretive gap into the
+record instead of pretending the 5/5 margin was as clean as it looked.
+
+**4.** Before building Milestone 4's improvement, I asked Claude to argue
+against my own plan: "I'm going to add hybrid search to fix the duplicate-fact
+retrieval risk from criterion 1, tell me why that might not work." It
+predicted that BM25 keyword matching could promote a document sharing literal
+words with the question over the actually-relevant one — which is exactly
+what happened: a chunk about weekday markets outranked the correct
+tram-schedule chunk because both shared the words "Marchwood" and "weekday."
+Because my criteria table stayed at 5/5 both before and after and couldn't
+show this, I asked Claude to help me find a second measurement — the rank of
+the answer-containing chunk — that could actually detect the regression the
+criteria were blind to.
+
+**5.** For the hybrid search implementation in store.py, I had Claude write
+it, then took the result to Gemini as a second technical opinion before
+accepting it — the same cross-checking approach I used in Unit 1 for the
+chunker. I specifically asked Gemini to verify two things: whether the
+`_bm25_cache` would behave safely across three repeated evaluation runs
+without rebuilding the index each time, and whether preserving the original
+Chroma cosine distances inside the Reciprocal Rank Fusion results would
+actually protect the 0.6 relevance gate for Criterion 3. Gemini confirmed both
+held up, which I then verified myself by running the out-of-scope questions
+directly and checking their distances stayed well clear of the cutoff
+(0.838–1.029).
+
 <!-- ── Stretch features ─────────────────────────────────────────────────────
      Doing one? Say so here BEFORE you start. A feature this README never
      claims earns nothing.
@@ -659,9 +694,27 @@ enough to detect a retrieval regression this size.
 
      Milestone 5. -->
 
+On paper, nothing is broken. All five criteria stayed at "MET" both before and after adding hybrid search. However, the experiment uncovered a hidden flaw my tests aren't designed to catch: keyword tunnel vision (lexical over-matching).
+
+The keyword search (BM25) can promote a paragraph to the top rank purely because it shares exact words with the question. For example, a chunk about weekday markets beat the actual tram schedule chunk simply because both contained the words "Marchwood" and "weekday"—even though the market chunk had nothing to do with what was asked.
+
+This didn't trigger a failure because Criterion 1 only checks if the right answer is somewhere in the top five results, not if it is ranked number one. Similarly, Criterion 5 only checks if the final answer is factually correct, not if the search results that fed it were messy. The AI generating the answer was smart enough to ignore the irrelevant market chunk and find the tram info further down the list. But I can't rely on that. A different model, or a harder question where the real answer is buried at the bottom, could easily get confused by having junk data handed to it first.
+
+**What I'd do about it:**
+I would adjust the math that combines the two searches (the RRF weights) so that keyword matches act more like tie-breakers for paragraphs that already share the same meaning, rather than letting exact keywords overpower semantic relevance from the start.
+
+**Why I stopped:**
+Fixing this is a delicate balancing act. To tune those weights properly, I would need a much larger set of test questions to ensure I am not just trading one search failure for another. Trying to tune the math using only my 5 current test questions would just be overfitting to this specific test, which is beyond the scope of this unit.
+
 ## What I'd Do Differently
 
 <!-- Knowing what you know now — which of your five criteria would you write
      differently, and why?
 
      Milestone 5. -->
+
+**Criterion 1 (Retrieved chunk contains the answer):** I would rewrite this to be much stricter. Instead of just asking if the answer is "somewhere in the top five," I would require it to be ranked number one (or at most, top two). My original, looser version is exactly why the hybrid search flaw slipped by unnoticed. When I ran the hybrid search experiment, the correct tram schedule dropped from rank 1 down to rank 2. My test still gave it a perfect passing grade because it was "somewhere in the top five." If a test can't detect when the system's performance actually gets worse, it simply isn't doing its job.
+
+**Criterion 4 (Chunks don't cut off mid-word or mid-sentence):** I would formally raise my target from 4/5 to 5/5. I originally set it at 4 out of 5 as a safety net, assuming the starter code would make a few slicing mistakes. But since I built a custom chunker that splits precisely on ## headings, perfectly clean chunks are now structurally guaranteed, not just a matter of luck. There is no realistic way for the system to score below 5/5 anymore, so the test should reflect that higher standard.
+
+**Criteria 2, 3, and 5:** I would leave these exactly as written. Nothing in this unit's testing gave me a reason to change them. Criteria 2 and 5 are strict pass/fail checks that did their jobs perfectly, and Criterion 3 already had the strictest possible target (5 out of 5) and still passed with a comfortable margin.
